@@ -12,6 +12,9 @@ For [`lazy.nvim`][2]
 ```lua
 {
   "goropikari/jnv.nvim",
+  dependencies = {
+    'nvim-telescope/telescope.nvim',
+  },
   opts = {
     -- default configuration
     path = 'jnv', -- path to jnv
@@ -54,8 +57,12 @@ jnv.nvim does not configure any mappings by default to avoid conflicts with user
 Some example mappings you could configure:
 
 ```lua
-vim.keymap.set('n', '<leader>j', jnv_current_buffer, { noremap = true, silent = true })
-vim.keymap.set('v', '<leader>j', jnv_selection, { noremap = true, silent = true })
+vim.keymap.set('n', '<leader>jn', jnv_current_buffer, { noremap = true, silent = true })
+vim.keymap.set('v', '<leader>jn', jnv_selection, { noremap = true, silent = true })
+vim.keymap.set('n', '<leader>jt', function()
+  require('telescope').extensions.jnv.jnv()
+  -- or vim.cmd([[:Telescope jnv]])
+end, { noremap = true, silent = true })
 vim.api.nvim_create_user_command('JnvSelection', function(opts)
   jnv_selection(opts)
 end, { range = 0 })

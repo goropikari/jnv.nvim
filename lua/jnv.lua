@@ -1,5 +1,11 @@
 local M = {}
 
+M.state = {
+  bufnrs = {},
+}
+
+local bufnrs = M.state.bufnrs
+
 local default_config = {
   path = 'jnv', -- path to jnv
   args = {}, -- the arguments passed to the jnv
@@ -38,6 +44,41 @@ local function get_buffer_text(bufnr)
   return vim.fn.join(texts, '')
 end
 
+function M.build_win_opts()
+  local layout = global_config.window.layout
+  local width = math.floor(vim.o.columns * global_config.window.width)
+  local height = math.floor(vim.o.lines * global_config.window.height)
+  local col = global_config.window.col or math.floor((vim.o.columns - width) / 2)
+  local row = global_config.window.row or math.floor((vim.o.lines - height) / 2)
+  local win_opts = {
+    width = width,
+    height = height,
+    style = 'minimal',
+  }
+  if layout == 'float' then
+    win_opts.relative = global_config.window.relative
+    win_opts.col = col
+    win_opts.row = row
+    win_opts.title = global_config.window.title
+    win_opts.border = global_config.window.border
+    win_opts = vim.tbl_deep_extend('force', win_opts, {
+      relative = global_config.window.relative,
+      col = col,
+      row = row,
+      title = global_config.window.title,
+      border = global_config.window.border,
+    })
+  elseif layout == 'vertical' then
+    win_opts.split = 'left'
+  elseif layout == 'horizontal' then
+    win_opts.split = 'below'
+  else
+    win_opts.split = layout
+  end
+
+  return win_opts
+end
+
 local function start_jnv(json_string)
   local temp_file = os.tmpname() .. '.json'
   local file, errmsg = io.open(temp_file, 'w')
@@ -48,7 +89,8 @@ local function start_jnv(json_string)
   file:write(json_string)
   file:close()
 
-  local buf = vim.api.nvim_create_buf(false, true)
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  table.insert(bufnrs, bufnr)
 
   local layout = global_config.window.layout
   local width = math.floor(vim.o.columns * global_config.window.width)
@@ -81,7 +123,7 @@ local function start_jnv(json_string)
     win_opts.split = layout
   end
 
-  local win_id = vim.api.nvim_open_win(buf, true, win_opts)
+  local win_id = vim.api.nvim_open_win(bufnr, true, win_opts)
 
   local cmd = { global_config.path }
   vim.list_extend(cmd, global_config.args or {})
@@ -90,7 +132,10 @@ local function start_jnv(json_string)
   vim.fn.termopen(vim.fn.join(cmd, ' '), {
     on_exit = function(_, exit_code, _)
       vim.notify('exit code ' .. tostring(exit_code))
-      vim.api.nvim_win_close(win_id, true)
+      if exit_code == 0 then
+        vim.api.nvim_win_close(win_id, true)
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+      end
       os.remove(temp_file)
     end,
   })
@@ -116,6 +161,15 @@ end
 
 function M.setup(opts)
   global_config = vim.tbl_deep_extend('force', default_config, opts or {})
+end
+
+function M.buffer_names()
+  for _, bufnr in ipairs(M.state.bufnrs) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      local name = vim.api.nvim_buf_get_name(bufnr)
+      print(name)
+    end
+  end
 end
 
 return M
